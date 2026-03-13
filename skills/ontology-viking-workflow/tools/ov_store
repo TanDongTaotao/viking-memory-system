@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# ov_store: 将映射结果存入 Viking 系统
+
+set -e
+
+INPUT_FILE=""
+VIKING_URI=""
+TITLE=""
+TAGS=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --title)
+      TITLE="$2"
+      shift 2
+      ;;
+    --tags)
+      TAGS="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -z "$INPUT_FILE" ]]; then
+        INPUT_FILE="$1"
+      elif [[ -z "$VIKING_URI" ]]; then
+        VIKING_URI="$1"
+      else
+        echo "多余参数: $1"
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$INPUT_FILE" || -z "$VIKING_URI" ]]; then
+  echo "用法: ov_store <输入文件> <viking_uri> [--title <标题>] [--tags <标签>]"
+  echo "示例: ov_store /tmp/mapped.json \"resources/mapped/project-x.md\" --title \"项目X\" --tags \"BIM,IFC\""
+  exit 1
+fi
+
+# 检查文件存在
+if [[ ! -f "$INPUT_FILE" ]]; then
+  echo "{\"error\":\"输入文件不存在: $INPUT_FILE\"}"
+  exit 1
+fi
+
+# 准备内容：读取 JSON 并转换为 Markdown
+CONTENT=$(cat "$INPUT_FILE")
+
+# 如果有标题，添加
+if [[ -n "$TITLE" ]]; then
+  CONTENT="# $TITLE\n\n$CONTENT"
+fi
+
+if [[ -n "$TAGS" ]]; then
+  CONTENT="$CONTENT\n\n**Tags:** $TAGS"
+fi
+
+# 调用 sv_write
+SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking}" export SV_WORKSPACE
+
+# 使用 python 调用 sv_write（通过 stdin 传参）
+WRITE_INPUT=$(cat <<EOF
+{
+  "uri": "$VIKING_URI",
+  "content": $(echo "$CONTENT" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+}
+EOF
+)
+
+echo "$WRITE_INPUT" | sv_write
+
+if [[ $? -eq 0 ]]; then
+  # 成功写入，尝试更新索引
+  DIR_PATH=$(dirname "$VIKING_URI" | sed 's/^viking:\/\///')
+  sv_update_layers "viking://$DIR_PATH" 2>/dev/null || true
+
+  echo "{\"status\":\"ok\",\"message\":\"已存储到 $VIKING_URI\"}"
+else
+  echo "{\"error\":\"存储失败\"}"
+  exit 1
+fi

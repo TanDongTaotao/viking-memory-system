@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# SimpleViking 自动化流程
+# 用途：任务开始/结束时自动调用
+
+MODE=$1
+
+case "$MODE" in
+  "start")
+    # 任务开始：预加载上下文
+    echo "=== 任务开始：加载上下文 ==="
+    # 加载最近任务相关上下文
+    ~/.openclaw/workspace/agents/maojingli/skills/simple-viking/scripts/sv find "recent task" viking://resources/ || true
+    echo "上下文已加载"
+    ;;
+    
+  "end")
+    # 任务结束：提取记忆
+    echo "=== 任务结束：提取记忆 ==="
+    # 获取最近会话文件
+    SESSION_FILE=$(ls -t ~/.openclaw/agents/maojingli/sessions/*.jsonl 2>/dev/null | head -1)
+    if [ -n "$SESSION_FILE" ]; then
+      echo "正在提取: $SESSION_FILE"
+      ~/.openclaw/workspace/agents/maojingli/skills/simple-viking/scripts/sv extract-memory --session "$SESSION_FILE"
+    else
+      echo "无会话文件"
+    fi
+    ;;
+    
+  "sync")
+    # 同步：更新知识库层级
+    echo "=== 知识库同步 ==="
+    ~/.openclaw/workspace/agents/maojingli/skills/simple-viking/scripts/sv update-layers viking://resources/
+    echo "层级已更新"
+    ;;
+    
+  *)
+    echo "用法: sv-automation [start|end|sync]"
+    echo "  start - 任务开始时加载上下文"
+    echo "  end - 任务结束后提取记忆"
+    echo "  sync - 定期同步知识库层级"
+    ;;
+esac

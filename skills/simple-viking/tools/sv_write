@@ -1,0 +1,9 @@
+#!/bin/bash
+# SimpleViking tool wrapper with correct paths
+
+export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-${AGENT_NAME:-maojingli}}"
+export OLLAMA_HOST="${OLLAMA_HOST:-http://192.168.5.110:11434}"
+export EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text:latest}"
+
+# 调用核心脚本
+exec "$HOME/.openclaw/skills/simple-viking/scripts/'"${BASH_SOURCE[0]##*/}"' "$@"
