@@ -4,15 +4,15 @@
 hooks:
   on_session_start:
     - name: "Viking 记忆加载"
-      script: "/home/xlous/.openclaw/scripts/sv_autoload.sh"
+      script: "$HOME/.openclaw/scripts/sv_autoload.sh"
       enabled: true
       timeout: 30
       env:
-        SV_WORKSPACE: "/home/xlous/.openclaw/viking-maojingli"
+        SV_WORKSPACE: "$HOME/.openclaw/viking-{agent}"
         OLLAMA_HOST: "http://192.168.5.110:11434"
-        
+
   on_session_end:
     - name: "Viking 记忆保存"
-      script: "/home/xlous/.openclaw/scripts/sv_save.sh"
+      script: "$HOME/.openclaw/scripts/sv_save.sh"
       enabled: false
       timeout: 30

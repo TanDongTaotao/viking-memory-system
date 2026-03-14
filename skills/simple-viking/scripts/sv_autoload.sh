@@ -8,7 +8,7 @@ SCRIPT_DIR="$(dirname "$0")"
 source "$SCRIPT_DIR/lib.sh"
 
 # 默认 Agent
-AGENT_NAME="${1:-maojingli}"
+AGENT_NAME="${1:-{agent}}"
 SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-$AGENT_NAME}"
 
 echo "=== Viking Auto-Load: $AGENT_NAME ==="

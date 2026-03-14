@@ -2,76 +2,76 @@ hooks:
 - on_session_end:
   - enabled: false
     name: Viking 记忆保存
-    script: /home/xlous/.openclaw/scripts/sv_save.sh
+    script: $HOME/.openclaw/scripts/sv_save.sh
     timeout: 30
   on_session_start:
   - background: false
     enabled: true
     env:
-      SV_WORKSPACE: /home/xlous/.openclaw/viking-maozhuli
+      SV_WORKSPACE: $HOME/.openclaw/viking-{agent}
       VIKING_ENABLE_WATCHER: 'true'
     name: Viking 记忆加载 + 实时监听
-    script: /home/xlous/.openclaw/scripts/sv_autoload.sh
+    script: $HOME/.openclaw/scripts/sv_autoload.sh
     timeout: 60
   when:
-    agent: maozhuli
+    agent: {agent}
 - on_session_end:
   - enabled: false
     name: Viking 记忆保存
-    script: /home/xlous/.openclaw/scripts/sv_save.sh
+    script: $HOME/.openclaw/scripts/sv_save.sh
     timeout: 30
   on_session_start:
   - background: false
     enabled: true
     env:
-      SV_WORKSPACE: /home/xlous/.openclaw/viking-maoxiami
+      SV_WORKSPACE: $HOME/.openclaw/viking-{agent}
       VIKING_ENABLE_WATCHER: 'true'
     name: Viking 记忆加载 + 实时监听
-    script: /home/xlous/.openclaw/scripts/sv_autoload.sh
+    script: $HOME/.openclaw/scripts/sv_autoload.sh
     timeout: 60
   when:
-    agent: maoxiami
+    agent: {agent}
 - on_session_end:
   - enabled: false
     name: Viking 记忆保存
-    script: /home/xlous/.openclaw/scripts/sv_save.sh
+    script: $HOME/.openclaw/scripts/sv_save.sh
     timeout: 30
   on_session_start:
   - background: false
     enabled: true
     env:
-      SV_WORKSPACE: /home/xlous/.openclaw/viking-maogongtou
+      SV_WORKSPACE: $HOME/.openclaw/viking-{agent}
       VIKING_ENABLE_WATCHER: 'true'
     name: Viking 记忆加载 + 实时监听
-    script: /home/xlous/.openclaw/scripts/sv_autoload.sh
+    script: $HOME/.openclaw/scripts/sv_autoload.sh
     timeout: 60
   when:
-    agent: maogongtou
+    agent: {agent}
 - on_session_end:
   - enabled: false
     name: Viking 记忆保存
-    script: /home/xlous/.openclaw/scripts/sv_save.sh
+    script: $HOME/.openclaw/scripts/sv_save.sh
     timeout: 30
   on_session_start:
   - background: false
     enabled: true
     env:
-      SV_WORKSPACE: /home/xlous/.openclaw/viking-maojingli
+      SV_WORKSPACE: $HOME/.openclaw/viking-{agent}
       VIKING_ENABLE_WATCHER: 'true'
     name: Viking 记忆加载 + 实时监听
-    script: /home/xlous/.openclaw/scripts/sv_autoload.sh
+    script: $HOME/.openclaw/scripts/sv_autoload.sh
     timeout: 60
   when:
-    agent: maojingli
+    agent: {agent}
 - on_session_start:
   - background: true
     enabled: true
     env:
-      SV_WORKSPACE: /home/xlous/.openclaw/viking-global
+      SV_WORKSPACE: $HOME/.openclaw/viking-global
       VIKING_ENABLE_WATCHER: 'true'
-      WATCH_DIR_OVERRIDE: /home/xlous/.openclaw/viking-global
+      WATCH_DIR_OVERRIDE: $HOME/.openclaw/viking-global
     name: Viking-Global 实时监听
-    script: /home/xlous/.openclaw/scripts/sv_memory_watcher.sh
+    script: $HOME/.openclaw/scripts/sv_memory_watcher.sh
     timeout: 10
   when:
-    agent: maojingli
+    agent: {agent}

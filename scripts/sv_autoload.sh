@@ -5,7 +5,7 @@
 
 set -e
 
-AGENT_NAME="${AGENT_NAME:-${OPENCLAW_AGENT_NAME:-maojingli}}"
+AGENT_NAME="${AGENT_NAME:-${OPENCLAW_AGENT_NAME:-{agent}}}"
 SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-${AGENT_NAME}}"
 
 echo "## Viking 记忆加载"

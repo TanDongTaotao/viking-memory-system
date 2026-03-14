@@ -2,7 +2,7 @@
 # Viking 记忆保存脚本
 # 用于 on_session_end 钩子
 
-AGENT_NAME="${AGENT_NAME:-maojingli}"
+AGENT_NAME="${AGENT_NAME:-{agent}}"
 SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-$AGENT_NAME}"
 
 echo "保存会话记忆到 Viking..."
