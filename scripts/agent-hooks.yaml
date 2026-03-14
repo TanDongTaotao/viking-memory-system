@@ -1,0 +1,18 @@
+# OpenClaw Agent Hooks 配置
+# 官方 Feature Request: https://github.com/openclaw/openclaw/issues/44661
+
+hooks:
+  on_session_start:
+    - name: "Viking 记忆加载"
+      script: "/home/xlous/.openclaw/scripts/sv_autoload.sh"
+      enabled: true
+      timeout: 30
+      env:
+        SV_WORKSPACE: "/home/xlous/.openclaw/viking-maojingli"
+        OLLAMA_HOST: "http://192.168.5.110:11434"
+        
+  on_session_end:
+    - name: "Viking 记忆保存"
+      script: "/home/xlous/.openclaw/scripts/sv_save.sh"
+      enabled: false
+      timeout: 30

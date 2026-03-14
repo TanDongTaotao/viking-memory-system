@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Viking 向量化搜索命令行工具
+# 用法: 
+#   sv build-index           # 构建向量索引
+#   sv sematic <query>       # 语义搜索
+#   sv hybrid <query>        # 混合搜索
+#   sv autoload [agent]      # 自动加载上下文
+
+SCRIPT_DIR="$(dirname "$0")"
+
+# 加载基础库
+source "$SCRIPT_DIR/lib.sh"
+
+CMD="${1:-help}"
+shift || true
+
+case "$CMD" in
+  build-index|build)
+    root="${1:-$SV_WORKSPACE}"
+    limit="${2:-100}"
+    sv_build_vector_index "$root" "$limit"
+    ;;
+  
+  semantic|sem)
+    query="$1"
+    top_k="${2:-5}"
+    sv_semantic_search "$query" "$SV_WORKSPACE" "$top_k"
+    ;;
+  
+  hybrid)
+    query="$1"
+    top_k="${2:-5}"
+    sv_hybrid_search "$query" "$SV_WORKSPACE" "$top_k"
+    ;;
+  
+  autoload|load)
+    agent="${1:-maojingli}"
+    "$SCRIPT_DIR/sv_autoload.sh" "$agent"
+    ;;
+  
+  test-ollama)
+    echo "测试 Ollama 连接..."
+    curl -s "$OLLAMA_HOST/api/tags" | python3 -c "import sys,json; d=json.load(sys.stdin); print('✅ Ollama 连接成功'); [print(f'  - {m[\"name\"]}') for m in d.get('models',[])]"
+    ;;
+  
+  help|--help|-h)
+    echo "Viking 向量化搜索工具"
+    echo ""
+    echo "用法: sv <命令> [参数]"
+    echo ""
+    echo "命令:"
+    echo "  build-index [目录] [上限]  构建向量索引"
+    echo "  semantic <查询> [top-k]     语义搜索"
+    echo "  hybrid <查询> [top-k]      混合搜索"
+    echo "  autoload [agent]           加载会话上下文"
+    echo "  test-ollama                测试 Ollama 连接"
+    echo ""
+    echo "示例:"
+    echo "  sv build-index ~/.openclaw/viking-maojingli 50"
+    echo "  sv semantic \"猫经理今天做了什么\""
+    echo "  sv autoload maojingli"
+    ;;
+  
+  *)
+    echo "未知命令: $CMD"
+    echo "运行 'sv help' 查看帮助"
+    exit 1
+    ;;
+esac

@@ -1,86 +1,86 @@
-# Viking 记忆系统架构设计
+# Viking Memory System Architecture Design
 
-本文档详细介绍 Viking 记忆系统的整体架构设计和核心组件。
+This document provides a detailed overview of the Viking Memory System's overall architecture and core components.
 
-## 目录
+## Table of Contents
 
-1. [系统概述](#系统概述)
-2. [整体架构](#整体架构)
-3. [核心组件](#核心组件)
-4. [数据流设计](#数据流设计)
-5. [存储结构](#存储结构)
-6. [集成方案](#集成方案)
-7. [扩展设计](#扩展设计)
-
----
-
-## 系统概述
-
-### 设计目标
-
-Viking 记忆系统的核心目标是**模拟人类记忆的层级衰减机制**，实现智能记忆管理：
-
-1. **记忆生命周期管理** - 自动从完整细节压缩到归档保留
-2. **重要性加权** - 基于访问和时间自动计算权重
-3. **搜索触发回忆** - 归档记忆可通过关键词搜索恢复
-4. **无缝框架集成** - 通过 Hook 机制与 OpenClaw 集成
-
-### 核心特性
-
-| 特性 | 说明 |
-|------|------|
-| 层级衰减 | L0→L1→L2→L3→L4 自动压缩 |
-| 权重计算 | importance × time_decay × access_boost |
-| 归档回忆 | L4 归档 + LLM 关键词恢复 |
-| OpenClaw Hook | 会话开始/结束自动触发 |
+1. [System Overview](#system-overview)
+2. [Overall Architecture](#overall-architecture)
+3. [Core Components](#core-components)
+4. [Data Flow Design](#data-flow-design)
+5. [Storage Structure](#storage-structure)
+6. [Integration](#integration)
+7. [Extension Design](#extension-design)
 
 ---
 
-## 整体架构
+## System Overview
 
-### 架构图
+### Design Goals
+
+The core goal of the Viking Memory System is to **simulate human memory's hierarchical decay mechanism** for intelligent memory management:
+
+1. **Memory Lifecycle Management** - Auto-compress from full details to archive retention
+2. **Importance Weighting** - Auto-calculate weight based on access and time
+3. **Search-Triggered Recall** - Archived memories can be recovered via keyword search
+4. **Seamless Framework Integration** - Integrate with OpenClaw via Hook mechanism
+
+### Core Features
+
+| Feature | Description |
+|---------|-------------|
+| Hierarchical Decay | L0→L1→L2→L3→L4 auto-compression |
+| Weight Calculation | importance × time_decay × access_boost |
+| Archive Recall | L4 archive + LLM keyword recovery |
+| OpenClaw Hook | Auto-trigger at session start/end |
+
+---
+
+## Overall Architecture
+
+### Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Viking 记忆系统架构                            │
+│                      Viking Memory System Architecture                   │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                        用户层 (User Layer)                       │   │
+│  │                        User Layer                               │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │   │
-│  │  │  CLI 命令   │  │ OpenClaw    │  │  Web UI     │            │   │
-│  │  │ (sv_* 命令) │  │   Agent     │  │  (可选)     │            │   │
+│  │  │  CLI cmds   │  │  OpenClaw   │  │  Web UI     │            │   │
+│  │  │ (sv_*)      │  │   Agent     │  │  (Optional) │            │   │
 │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘            │   │
 │  └─────────┼────────────────┼────────────────┼────────────────────┘   │
 │            │                │                │                          │
 │            ▼                ▼                ▼                          │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      接口层 (API Layer)                          │   │
+│  │                       API Layer                                  │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │   │
-│  │  │  sv_write   │  │  sv_find    │  │  sv_read    │            │   │
-│  │  │  写入接口   │  │  搜索接口    │  │  读取接口   │            │   │
+│  │  │  sv_write   │  │  sv_find    │  │  sv_read     │            │   │
+│  │  │  Write API  │  │  Search API │  │  Read API    │            │   │
 │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘            │   │
 │  └─────────┼────────────────┼────────────────┼────────────────────┘   │
 │            │                │                │                          │
 │            ▼                ▼                ▼                          │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    核心引擎 (Core Engine)                        │   │
+│  │                      Core Engine                                 │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │   │
-│  │  │  记忆存储   │  │  权重计算   │  │  压缩引擎   │            │   │
-│  │  │  Manager    │  │  Weighter   │  │  Compressor │            │   │
+│  │  │  Memory     │  │  Weight     │  │  Compress   │            │   │
+│  │  │  Manager    │  │  Calculator │  │  Engine     │            │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘            │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │   │
-│  │  │  搜索索引   │  │  回忆恢复   │  │  Hook 加载  │            │   │
-│  │  │  Searcher   │  │  Recall     │  │  Loader     │            │   │
+│  │  │  Search    │  │  Recall     │  │  Hook       │            │   │
+│  │  │  Engine    │  │  Recovery   │  │  Loader     │            │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘            │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │            │                │                │                          │
 │            ▼                ▼                ▼                          │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      存储层 (Storage Layer)                       │   │
+│  │                     Storage Layer                                │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐   │   │
-│  │  │  文件系统       │  │  向量存储       │  │  配置存储     │   │   │
-│  │  │  (Markdown)    │  │  (可选-Chroma)  │  │  (YAML)       │   │   │
+│  │  │  File System    │  │  Vector Store   │  │  Config Store  │   │   │
+│  │  │  (Markdown)     │  │ (Optional-Chroma)│ │   (YAML)      │   │   │
 │  │  └─────────────────┘  └─────────────────┘  └────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
@@ -88,56 +88,56 @@ Viking 记忆系统的核心目标是**模拟人类记忆的层级衰减机制**
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        外部集成 (External Integration)                   │
+│                      External Integration                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────────────┐  │
-│  │   OpenClaw      │  │    LLM 服务     │  │    其他 Agent 框架    │  │
-│  │   Framework     │  │   (Ollama)      │  │   (需适配)            │  │
+│  │   OpenClaw      │  │    LLM Service │  │   Other Agent Frameworks│  │
+│  │   Framework     │  │   (Ollama)      │  │   (Need Adaptation)    │  │
 │  └─────────────────┘  └─────────────────┘  └────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 核心组件
+## Core Components
 
-### 1. 记忆存储管理器 (MemoryManager)
+### 1. Memory Manager
 
-**职责**: 负责记忆的 CRUD 操作
+**Responsibility**: CRUD operations for memories
 
 ```python
 class MemoryManager:
-    """记忆存储管理器"""
+    """Memory storage manager"""
     
     def write(self, path: str, content: str, metadata: dict) -> bool
-    def read(self, path: str) -> dict  # 返回 content + metadata
+    def read(self, path: str) -> dict  # Returns content + metadata
     def delete(self, path: str) -> bool
-    def list(self, filters: dict) -> list  # 支持层级/重要性过滤
+    def list(self, filters: dict) -> list  # Supports layer/importance filters
     def update_metadata(self, path: str, metadata: dict) -> bool
 ```
 
-### 2. 权重计算器 (Weighter)
+### 2. Weighter
 
-**职责**: 计算和更新记忆权重
+**Responsibility**: Calculate and update memory weights
 
 ```python
 class Weighter:
-    """记忆权重计算器"""
+    """Memory weight calculator"""
     
-    # 权重公式: W = importance_factor × (1/(days+1)^0.3) × (access_count+1)
+    # Formula: W = importance_factor × (1/(days+1)^0.3) × (access_count+1)
     
     def calculate(self, memory: dict) -> float
-    def refresh_on_access(self, memory_id: str) -> dict  # 访问时刷新
-    def get_layer(self, weight: float) -> str  # 权重→层级映射
+    def refresh_on_access(self, memory_id: str) -> dict  # Refresh on access
+    def get_layer(self, weight: float) -> str  # Weight→layer mapping
 ```
 
-### 3. 压缩引擎 (Compressor)
+### 3. Compressor
 
-**职责**: 负责记忆层级压缩
+**Responsibility**: Memory layer compression
 
 ```python
 class Compressor:
-    """记忆压缩引擎"""
+    """Memory compression engine"""
     
     TRIGGERS = {
         1:  'compress_to_contour',   # L0 → L1
@@ -147,70 +147,70 @@ class Compressor:
     }
     
     def check_and_compress(self, memory: dict) -> dict
-    def compress_to_contour(self, memory: dict) -> dict   # LLM 生成轮廓
-    def compress_to_keywords(self, memory: dict) -> dict  # LLM 提取关键词
-    def compress_to_tags(self, memory: dict) -> dict       # LLM 提取标签
-    def mark_for_archive(self, memory: dict) -> dict      # L4 归档
+    def compress_to_contour(self, memory: dict) -> dict   # LLM generates contour
+    def compress_to_keywords(self, memory: dict) -> dict  # LLM extracts keywords
+    def compress_to_tags(self, memory: dict) -> dict       # LLM extracts tags
+    def mark_for_archive(self, memory: dict) -> dict      # L4 archive
 ```
 
-### 4. 搜索引擎 (Searcher)
+### 4. Searcher
 
-**职责**: 记忆搜索和过滤
+**Responsibility**: Memory search and filtering
 
 ```python
 class Searcher:
-    """记忆搜索引擎"""
+    """Memory search engine"""
     
     def search(self, query: str, filters: dict) -> list
-    def search_by_layer(self, layer: str) -> list  # 按层级搜索
-    def search_archived(self, query: str) -> list  # 搜索归档触发回忆
-    def fuzzy_match(self, keyword: str) -> list    # 模糊匹配
+    def search_by_layer(self, layer: str) -> list  # Search by layer
+    def search_archived(self, query: str) -> list  # Search archive trigger recall
+    def fuzzy_match(self, keyword: str) -> list    # Fuzzy matching
 ```
 
-### 5. 回忆恢复器 (Recall)
+### 5. Recall
 
-**职责**: 归档记忆的 LLM 恢复
+**Responsibility**: LLM recovery for archived memories
 
 ```python
 class Recall:
-    """记忆回忆恢复器"""
+    """Memory recall recoverer"""
     
     def recall(self, archived_memory: dict, query: str) -> str
-    # 使用 LLM 根据关键词恢复完整记忆
+    # Uses LLM to recover full memory from keywords
 ```
 
-### 6. Hook 加载器 (HookLoader)
+### 6. HookLoader
 
-**职责**: OpenClaw Hook 机制集成
+**Responsibility**: OpenClaw Hook mechanism integration
 
 ```python
 class HookLoader:
-    """OpenClaw Hook 加载器"""
+    """OpenClaw Hook loader"""
     
     def load_config(self, config_path: str) -> dict
     def execute_hook(self, hook_name: str, context: str) -> str
-    def on_session_start(self) -> str  # 会话开始触发
-    def on_session_end(self) -> str     # 会话结束触发
+    def on_session_start(self) -> str  # Session start trigger
+    def on_session_end(self) -> str     # Session end trigger
 ```
 
 ---
 
-## 数据流设计
+## Data Flow Design
 
-### 写入数据流
+### Write Data Flow
 
 ```
-用户输入 (sv_write)
+User Input (sv_write)
        │
        ▼
 ┌──────────────────┐
-│  验证 & 解析     │
-│  输入处理         │
+│  Validate & Parse│
+│  Input Processing│
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│  生成元数据      │
+│  Generate Metadata│
 │  - id            │
 │  - created       │
 │  - importance   │
@@ -218,129 +218,131 @@ class HookLoader:
          │
          ▼
 ┌──────────────────┐
-│  保存到文件系统  │
-│  Markdown 格式   │
+│  Save to File    │
+│  Markdown Format │
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│  更新索引        │
-│  (可选: 向量)    │
+│  Update Index    │
+│  (Optional: Vector)│
 └────────┬─────────┘
          │
          ▼
-    [完成]
+    [Done]
 ```
 
-### 读取数据流
+### Read Data Flow
 
 ```
-用户请求 (sv_read/sv_find)
+User Request (sv_read/sv_find)
        │
        ▼
 ┌──────────────────┐
-│  查询索引        │
-│  匹配记忆        │
+│  Query Index    │
+│  Match Memories │
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│  检查层级        │
-│  是归档(L4)?     │
+│  Check Layer    │
+│  Is Archive(L4)?│
 └────────┬─────────┘
          │
     ┌────┴────┐
-    │ 是      │ 否
+    │ Yes     │ No
     ▼         ▼
 ┌────────┐ ┌──────────────────┐
-│ 触发   │ │ 直接返回内容     │
-│ 回忆   │ │ 更新访问计数     │
+│ Trigger│ │ Return Content  │
+│ Recall │ │ Update Access   │
 └────┬───┘ └────────┬─────────┘
      │              │
      ▼              ▼
 ┌──────────────┐ ┌──────────────────┐
-│ LLM 恢复     │ │ 刷新权重         │
-│ 关键词→内容  │ │ access_count++   │
-└──────┬──────┘ └────────┬─────────┘
-       │                 │
-       └────────┬────────┘
+│ LLM Recovery │ │ Refresh Weight  │
+│ Keyword→Content│ │ access_count++  │
+└──────┬───────┘ └────────┬─────────┘
+       │                  │
+       └────────┬─────────┘
                 ▼
-           [返回用户]
+           [Return to User]
 ```
 
-### 压缩数据流
+### Compression Data Flow
 
 ```
-定时任务 (每日 cron)
+Scheduled Task (Daily cron)
        │
        ▼
 ┌──────────────────┐
-│  扫描所有记忆    │
-│  检查天数        │
+│  Scan All Memories│
+│  Check Days      │
 └────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
-│  遍历记忆       │
+│  Iterate Memories│
 │  for each mem   │
 └────────┬─────────┘
          │
     ┌────┴────┐
-    │ 达到压缩条件?  │
+    │ Compression│
+    │ Condition? │
     └────┬────┘
          │
     ┌────┴────┐
-    │ 是      │ 否 → 下一条
+    │ Yes     │ No → Next
     ▼         ▼
 ┌────────┐
-│ 调用LLM │
-│ 生成压缩│
-│ 内容    │
-└────┬───┘
+│ Call LLM │
+│ Generate │
+│ Compressed│
+│ Content  │
+└────┬─────┘
      │
      ▼
 ┌──────────────────┐
-│  更新记忆层级   │
+│  Update Layer   │
 │  content_Lx     │
 └────────┬─────────┘
          │
          ▼
-    [继续下一条]
+    [Continue]
 ```
 
 ---
 
-## 存储结构
+## Storage Structure
 
-### 目录结构
+### Directory Structure
 
 ```
 ~/.openclaw/viking-{agent}/
-├── config.yaml                 # Viking 配置
+├── config.yaml                 # Viking config
 ├── agent/
 │   ├── memories/
-│   │   ├── daily/             # 每日记忆
+│   │   ├── daily/             # Daily memories
 │   │   │   └── YYYY-MM-DD.md
-│   │   ├── long-term/         # 长期记忆
-│   │   └── meetings/         # 会议记忆
-│   ├── instructions/         # 系统指令
-│   └── config.md             # Agent 配置
+│   │   ├── long-term/         # Long-term memories
+│   │   └── meetings/         # Meeting memories
+│   ├── instructions/         # System instructions
+│   └── config.md             # Agent config
 ├── user/
-│   ├── preferences/          # 用户偏好
-│   └── habits/              # 习惯
-├── resources/                # 资源文件
-└── .index/                   # 搜索索引 (可选)
+│   ├── preferences/          # User preferences
+│   └── habits/               # Habits
+├── resources/                # Resource files
+└── .index/                   # Search index (optional)
 ```
 
-### 记忆文件格式 (Markdown + Frontmatter)
+### Memory File Format (Markdown + Frontmatter)
 
 ```markdown
 ---
 id: mem_20260314_001
-title: "2026-03-14 今日工作"
+title: "2026-03-14 Today's Work"
 importance: high
 important: false
-tags: [工作, 项目A]
+tags: [work, projectA]
 created: 2026-03-14T10:30:00Z
 last_access: 2026-03-14T14:22:00Z
 access_count: 5
@@ -350,45 +352,45 @@ level: 0
 weight: 14.2
 ---
 
-# 今日工作
+# Today's Work
 
-## 任务完成
-- 完成项目 A 的开发
-- 代码审查
+## Tasks Completed
+- Completed project A development
+- Code review
 
-## 待办
-- 准备周报
-
----
-
-## 轮廓 (L1)
-
-项目A开发完成，准备周报。
+## Todo
+- Prepare weekly report
 
 ---
 
-### 关键词 (L2)
+## Contour (L1)
 
-项目A, 代码审查, 周报
+Project A completed, prepare weekly report.
 
 ---
 
-### 标签 (L3)
+### Keywords (L2)
 
-#项目A #周报
+ProjectA, CodeReview, WeeklyReport
+
+---
+
+### Tags (L3)
+
+#ProjectA #WeeklyReport
 ```
 
 ---
 
-## 集成方案
+## Integration
 
-### OpenClaw 集成
+### OpenClaw Integration
 
 ```yaml
 # ~/.openclaw/config/agent-hooks.yaml
 hooks:
   on_session_start:
-    - name: "Viking 记忆加载"
+    - name: "Viking Memory Loader"
       command: "/path/to/sv_autoload.sh"
       enabled: true
       timeout: 30
@@ -396,16 +398,16 @@ hooks:
         SV_WORKSPACE: "/home/xlous/.openclaw/viking-{agent}"
         
   on_session_end:
-    - name: "Viking 记忆保存"
+    - name: "Viking Memory Saver"
       command: "/path/to/sv_save.sh"
       enabled: false
       timeout: 30
 ```
 
-### LLM 服务集成
+### LLM Service Integration
 
 ```python
-# 支持多种 LLM 服务
+# Support multiple LLM services
 LLM_SERVICES = {
     'ollama': {
         'base_url': 'http://192.168.5.110:11434',
@@ -424,50 +426,50 @@ LLM_SERVICES = {
 
 ---
 
-## 扩展设计
+## Extension Design
 
-### 向量搜索扩展
-
-```
-当前: 关键词匹配 (grep/find)
-扩展: 向量相似度搜索 (Chroma)
-
-方案:
-1. 嵌入模型: sentence-transformers
-2. 向量库: Chroma / Milvus
-3. 索引更新: 写入时异步更新
-```
-
-### 多模态扩展
+### Vector Search Extension
 
 ```
-支持:
-- 图片记忆 (OCR + 描述)
-- 语音记忆 (ASR + 摘要)
-- 文件记忆 (提取文本)
+Current: Keyword matching (grep/find)
+Extension: Vector similarity search (Chroma)
+
+Plan:
+1. Embedding model: sentence-transformers
+2. Vector DB: Chroma / Milvus
+3. Index update: Async on write
 ```
 
-### 分布式扩展
+### Multimodal Extension
 
 ```
-当前: 单机文件存储
-扩展: 分布式存储
+Support:
+- Image memory (OCR + description)
+- Voice memory (ASR + summary)
+- File memory (text extraction)
+```
 
-方案:
-1. S3/OSS 对象存储
-2. Redis 缓存层
-3. PostgreSQL 元数据
+### Distributed Extension
+
+```
+Current: Single-machine file storage
+Extension: Distributed storage
+
+Plan:
+1. S3/OSS object storage
+2. Redis cache layer
+3. PostgreSQL metadata
 ```
 
 ---
 
-## 相关文档
+## Related Documentation
 
-- [Viking 设计文档](./docs/viking-design.md)
-- [嵌入指南](./docs/embedding-guide.md)
-- [部署指南](./docs/deployment.md)
-- [OpenClaw 改动说明](./docs/openclaw-modifications.md)
+- [Viking Design Document](./docs/viking-design-en.md)
+- [Embedding Guide](./docs/embedding-guide-en.md)
+- [Deployment Guide](./docs/deployment-en.md)
+- [OpenClaw Modifications](./docs/openclaw-modifications.md)
 
 ---
 
-*文档版本: v2.0 | 更新日期: 2026-03-14*
+*Document Version: v2.0 | Updated: 2026-03-14*

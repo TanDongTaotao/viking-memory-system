@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ov_search: 在 Viking 系统中搜索已映射的数据
+
+set -e
+
+KEYWORDS=""
+WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking}"
+LAYER=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --workspace)
+      WORKSPACE="$2"
+      shift 2
+      ;;
+    --layer)
+      LAYER="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -z "$KEYWORDS" ]]; then
+        KEYWORDS="$1"
+      else
+        echo "多余参数: $1"
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$KEYWORDS" ]]; then
+  echo "用法: ov_search <关键词> [--workspace <路径>] [--layer <l0|l1|l2>]"
+  exit 1
+fi
+
+# 设置 workspace
+export SV_WORKSPACE="$WORKSPACE"
+
+# 构建 sv_find 命令
+CMD="sv_find \"$KEYWORDS\""
+if [[ -n "$LAYER" ]]; then
+  CMD="$CMD --layer $LAYER"
+fi
+
+# 执行搜索
+echo "{\"status\":\"searching\",\"workspace\":\"$WORKSPACE\",\"keywords\":\"$KEYWORDS\"}"
+eval $CMD

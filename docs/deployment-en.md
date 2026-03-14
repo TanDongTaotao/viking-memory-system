@@ -1,36 +1,36 @@
-# Viking 记忆系统部署指南
+# Viking Memory System Deployment Guide
 
-本文档详细介绍 Viking 记忆系统在不同环境下的部署方案。
+This document provides detailed deployment solutions for the Viking Memory System in different environments.
 
-## 目录
+## Table of Contents
 
-1. [部署架构](#部署架构)
-2. [开发环境部署](#开发环境部署)
-3. [生产环境部署](#生产环境部署)
-4. [Docker 部署](#docker-部署)
-5. [Kubernetes 部署](#kubernetes-部署)
-6. [监控与运维](#监控与运维)
-7. [安全配置](#安全配置)
-8. [备份与恢复](#备份与恢复)
+1. [Deployment Architecture](#deployment-architecture)
+2. [Development Deployment](#development-deployment)
+3. [Production Deployment](#production-deployment)
+4. [Docker Deployment](#docker-deployment)
+5. [Kubernetes Deployment](#kubernetes-deployment)
+6. [Monitoring and Operations](#monitoring-and-operations)
+7. [Security Configuration](#security-configuration)
+8. [Backup and Recovery](#backup-and-recovery)
 
 ---
 
-## 部署架构
+## Deployment Architecture
 
-### 单机部署架构
+### Single Machine Deployment
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      单机部署架构                            │
+│                 Single Machine Deployment                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   ┌─────────────┐                                          │
-│   │   用户/Agent │                                          │
+│   │  User/Agent  │                                          │
 │   └──────┬──────┘                                          │
 │          │                                                  │
 │          ▼                                                  │
 │   ┌─────────────────────────────────────────────────────┐  │
-│   │                  OpenClaw / 应用                     │  │
+│   │                  OpenClaw / Application              │  │
 │   └──────────────────────┬──────────────────────────────┘  │
 │                          │                                   │
 │                          ▼                                   │
@@ -43,23 +43,23 @@
 │           │          │         │          │                  │
 │           ▼          ▼         ▼          ▼                  │
 │   ┌─────────────────────────────────────────────────────┐  │
-│   │              本地文件系统 (存储)                       │  │
+│   │              Local File System (Storage)             │  │
 │   │         ~/.openclaw/viking-{agent}                  │  │
 │   └─────────────────────────────────────────────────────┘  │
 │                          │                                   │
 │                          ▼                                   │
 │   ┌─────────────────────────────────────────────────────┐  │
-│   │              LLM 服务 (Ollama/API)                    │  │
+│   │              LLM Service (Ollama/API)                 │  │
 │   └─────────────────────────────────────────────────────┘  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 分布式部署架构
+### Distributed Deployment
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     分布式部署架构                           │
+│                  Distributed Deployment                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   ┌─────────┐  ┌─────────┐  ┌─────────┐                     │
@@ -77,7 +77,7 @@
 │          │                      │                           │
 │          ▼                      ▼                           │
 │   ┌─────────────┐        ┌─────────────┐                   │
-│   │ Viking API  │        │ Viking API  │  (多实例)          │
+│   │ Viking API  │        │ Viking API  │  (Multi-instance)  │
 │   │   Node 1    │        │   Node N    │                   │
 │   └──────┬──────┘        └──────┬──────┘                   │
 │          │                      │                           │
@@ -85,12 +85,12 @@
 │                     │                                        │
 │                     ▼                                        │
 │   ┌─────────────────────────────────────────────────────┐  │
-│   │              分布式存储 (S3/MinIO)                    │  │
+│   │              Distributed Storage (S3/MinIO)          │  │
 │   └─────────────────────────────────────────────────────┘  │
 │                          │                                   │
 │                          ▼                                   │
 │   ┌─────────────────────────────────────────────────────┐  │
-│   │              LLM 集群 (Ollama/K8s)                    │  │
+│   │              LLM Cluster (Ollama/K8s)                 │  │
 │   └─────────────────────────────────────────────────────┘  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -98,27 +98,27 @@
 
 ---
 
-## 开发环境部署
+## Development Deployment
 
-### 快速开始
+### Quick Start
 
 ```bash
-# 1. 克隆项目
+# 1. Clone project
 git clone https://github.com/Xlous/viking-memory-system.git
 cd viking-memory-system
 
-# 2. 运行安装脚本
+# 2. Run installation script
 chmod +x install.sh
 ./install.sh
 
-# 3. 初始化工作空间
+# 3. Initialize workspace
 mkdir -p ~/.openclaw/viking-dev
 
-# 4. 验证安装
+# 4. Verify installation
 ./scripts/sv_autoload.sh --help
 ```
 
-### 开发配置
+### Development Configuration
 
 ```yaml
 # ~/.openclaw/viking-dev/config.yaml
@@ -132,46 +132,46 @@ llm:
   host: http://localhost:11434
 
 memory:
-  auto_compress: false  # 开发环境关闭自动压缩
+  auto_compress: false  # Disable in dev
   compress_at: [1, 7, 30, 90]
 ```
 
 ---
 
-## 生产环境部署
+## Production Deployment
 
-### 系统要求
+### System Requirements
 
-| 配置 | 最低 | 推荐 |
-|------|------|------|
-| CPU | 2 核 | 4 核+ |
-| 内存 | 4 GB | 8 GB+ |
-| 磁盘 | 20 GB | 100 GB+ |
-| 系统 | Ubuntu 20.04+ | Ubuntu 22.04 LTS |
+| Config | Minimum | Recommended |
+|--------|---------|-------------|
+| CPU | 2 cores | 4 cores+ |
+| Memory | 4 GB | 8 GB+ |
+| Disk | 20 GB | 100 GB+ |
+| OS | Ubuntu 20.04+ | Ubuntu 22.04 LTS |
 
-### 安装步骤
+### Installation Steps
 
 ```bash
-# 1. 创建专用用户
+# 1. Create dedicated user
 sudo useradd -r -s /bin/false viking
 
-# 2. 安装依赖
+# 2. Install dependencies
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip curl jq
 
-# 3. 部署 Viking
+# 3. Deploy Viking
 sudo mkdir -p /opt/viking
 sudo git clone https://github.com/Xlous/viking-memory-system.git /opt/viking
 sudo chown -R viking:viking /opt/viking
 
-# 4. 配置 systemd 服务
+# 4. Configure systemd service
 sudo cp viking.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable viking
 sudo systemctl start viking
 ```
 
-### 生产配置
+### Production Configuration
 
 ```yaml
 # /opt/viking/config.yaml
@@ -206,7 +206,7 @@ security:
 
 ---
 
-## Docker 部署
+## Docker Deployment
 
 ### Dockerfile
 
@@ -215,23 +215,23 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装依赖
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制应用
+# Copy application
 COPY . .
 
-# 安装 Python 依赖
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 创建非root用户
+# Create non-root user
 RUN useradd -m viking && chown -R viking:viking /app
 USER viking
 
-# 暴露端口
+# Expose port
 EXPOSE 8080
 
 CMD ["python", "-m", "viking_api"]
@@ -273,25 +273,25 @@ volumes:
   ollama-data:
 ```
 
-### 构建和运行
+### Build and Run
 
 ```bash
-# 构建镜像
+# Build image
 docker build -t viking-memory:latest .
 
-# 运行
+# Run
 docker-compose up -d
 
-# 查看日志
+# View logs
 docker-compose logs -f
 
-# 停止
+# Stop
 docker-compose down
 ```
 
 ---
 
-## Kubernetes 部署
+## Kubernetes Deployment
 
 ### Deployment
 
@@ -384,76 +384,76 @@ spec:
       storage: 50Gi
 ```
 
-### 部署
+### Deploy
 
 ```bash
-# 部署
+# Deploy
 kubectl apply -f k8s/
 
-# 查看状态
+# Check status
 kubectl get pods -l app=viking-memory
 kubectl get svc viking-service
 
-# 扩展
+# Scale
 kubectl scale deployment viking-memory --replicas=5
 ```
 
 ---
 
-## 监控与运维
+## Monitoring and Operations
 
-### 日志配置
+### Logging Configuration
 
 ```yaml
-# 日志配置
+# Logging config
 logging:
   level: info
   file: /var/log/viking/viking.log
   max_size: 100MB
   max_backups: 10
   
-  # 结构化日志
+  # Structured logging
   format: json
   
-  # 日志字段
+  # Log fields
   fields:
     service: viking-memory
     version: 2.0.0
 ```
 
-### 监控指标
+### Monitoring Metrics
 
 ```python
 # prometheus_metrics.py
 from prometheus_client import Counter, Histogram, Gauge
 
-# 请求指标
+# Request metrics
 requests_total = Counter('viking_requests_total', 'Total requests')
 request_duration = Histogram('viking_request_duration_seconds')
 
-# 记忆指标
+# Memory metrics
 memories_count = Gauge('viking_memories_count', 'Total memories')
 memories_by_layer = Gauge('viking_memories_by_layer', 'Memories by layer', ['layer'])
 compression_total = Counter('viking_compression_total', 'Total compressions')
 
-# LLM 指标
+# LLM metrics
 llm_requests_total = Counter('viking_llm_requests_total')
 llm_request_duration = Histogram('viking_llm_request_duration_seconds')
 ```
 
-### 健康检查
+### Health Checks
 
 ```bash
-# 健康检查端点
+# Health check endpoint
 curl http://localhost:8080/health
 # {"status": "healthy", "version": "2.0.0"}
 
-# 就绪检查
+# Readiness check
 curl http://localhost:8080/ready
 # {"status": "ready", "llm_connected": true}
 ```
 
-### 告警规则
+### Alert Rules
 
 ```yaml
 # prometheus/alert-rules.yaml
@@ -479,14 +479,14 @@ groups:
 
 ---
 
-## 安全配置
+## Security Configuration
 
-### API 密钥
+### API Keys
 
 ```yaml
-# 安全配置
+# Security config
 security:
-  # API 密钥认证
+  # API key authentication
   api_keys:
     - key: "sk-prod-xxxxx"
       name: "production"
@@ -495,33 +495,33 @@ security:
       name: "development"
       rate_limit: 100
   
-  # JWT 配置 (可选)
+  # JWT config (optional)
   jwt:
     enabled: false
     secret: "${JWT_SECRET}"
     expiry: 3600
 ```
 
-### 权限控制
+### Permission Control
 
 ```bash
-# 文件权限
+# File permissions
 chmod 700 /opt/viking/scripts/*.sh
 chmod 600 /opt/viking/config.yaml
 chown -R viking:viking /opt/viking
 ```
 
-### 网络安全
+### Network Security
 
 ```yaml
-# 网络策略
+# Network policy
 network:
-  # 只允许内网访问
+  # Only allow internal network
   allowed_cidrs:
     - 10.0.0.0/8
     - 172.16.0.0/12
     
-  # TLS 配置
+  # TLS config
   tls:
     enabled: true
     cert_path: /etc/ssl/certs/viking.crt
@@ -530,9 +530,9 @@ network:
 
 ---
 
-## 备份与恢复
+## Backup and Recovery
 
-### 自动备份
+### Automated Backup
 
 ```bash
 #!/bin/bash
@@ -541,26 +541,26 @@ network:
 BACKUP_DIR="/backup/viking"
 DATE=$(date +%Y%m%d)
 
-# 创建备份目录
+# Create backup directory
 mkdir -p $BACKUP_DIR
 
-# 备份记忆数据
+# Backup memory data
 tar -czf $BACKUP_DIR/viking-$DATE.tar.gz \
     --exclude='*.log' \
     --exclude='.index' \
     /data/viking
 
-# 备份配置
+# Backup config
 cp /opt/viking/config.yaml $BACKUP_DIR/config-$DATE.yaml
 
-# 保留 30 天
+# Keep 30 days
 find $BACKUP_DIR -name "viking-*.tar.gz" -mtime +30 -delete
 find $BACKUP_DIR -name "config-*.yaml" -mtime +30 -delete
 
 echo "Backup completed: $DATE"
 ```
 
-### 恢复
+### Restore
 
 ```bash
 #!/bin/bash
@@ -569,38 +569,38 @@ echo "Backup completed: $DATE"
 BACKUP_FILE=$1
 TARGET_DIR="/data/viking"
 
-# 停止服务
+# Stop service
 systemctl stop viking
 
-# 恢复数据
+# Restore data
 tar -xzf $BACKUP_FILE -C /
 
-# 修复权限
+# Fix permissions
 chown -R viking:viking $TARGET_DIR
 
-# 启动服务
+# Start service
 systemctl start viking
 
 echo "Restore completed"
 ```
 
-### Cron 备份任务
+### Cron Backup Task
 
 ```bash
 # /etc/cron.d/viking-backup
-# 每天凌晨3点备份
+# Backup daily at 3 AM
 0 3 * * * root /opt/viking/scripts/backup.sh >> /var/log/viking-backup.log 2>&1
 ```
 
 ---
 
-## 相关文档
+## Related Documentation
 
-- [安装指南](../INSTALL.md)
-- [使用说明](../USAGE.md)
-- [架构设计](../ARCHITECTURE.md)
-- [OpenClaw 改动说明](./openclaw-modifications.md)
+- [Installation Guide](../INSTALL-en.md)
+- [Usage Guide](../USAGE-en.md)
+- [Architecture Design](../ARCHITECTURE-en.md)
+- [OpenClaw Modifications](./openclaw-modifications.md)
 
 ---
 
-*文档版本: v2.0 | 更新日期: 2026-03-14*
+*Document Version: v2.0 | Updated: 2026-03-14*

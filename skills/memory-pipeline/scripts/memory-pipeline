@@ -1,0 +1,212 @@
+#!/bin/bash
+#
+# memory-pipeline CLI 工具
+# 统一记忆存取工作流
+#
+
+set -e
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# 帮助信息
+show_help() {
+    cat << EOF
+memory-pipeline - 统一记忆存取工作流
+
+用法:
+    mp_store [选项]          存储记忆
+    mp_search <关键词>        搜索记忆
+    mp_global <内容>          写入全局记忆(跨Agent共享)
+    mp_autoload              自动加载所有记忆
+
+选项:
+    --content <文本>         要存储的内容
+    --title <标题>          记忆标题
+    --tags <标签>           标签（逗号分隔）
+    --global                 写入全局记忆
+    --help                  显示帮助
+
+示例:
+    mp_store --content "今天完成了任务" --title "2026-03-11"
+    mp_search "项目"
+    mp_global "任务完成：xxx" --title "xxx"
+    mp_autoload
+EOF
+}
+
+# 存储记忆
+do_store() {
+    local content=""
+    local title=""
+    local tags=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --content)
+                content="$2"
+                shift 2
+                ;;
+            --title)
+                title="$2"
+                shift 2
+                ;;
+            --tags)
+                tags="$2"
+                shift 2
+                ;;
+            *)
+                echo -e "${RED}未知选项: $1${NC}"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [ -z "$content" ]; then
+        echo -e "${RED}错误: 需要 --content 参数${NC}"
+        exit 1
+    fi
+    
+    # 设置 Viking workspace（从环境变量或默认值）
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    
+    # 生成文件名
+    local date_str=$(date +%Y-%m-%d)
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local viking_path="viking://agent/memories/daily/${date_str}.md"
+    
+    # 构建 Markdown 内容
+    local md_content="# ${title:-今日记忆}\n\n${content}\n"
+    if [ -n "$tags" ]; then
+        md_content+="\n**标签**: ${tags}\n"
+    fi
+    md_content+="\n**创建时间**: $(date)\n"
+    
+    # 写入 Viking
+    echo -e "${YELLOW}正在存储到 Viking...${NC}"
+    echo -e "$md_content" | sv_write "$viking_path"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 记忆已存储: $viking_path${NC}"
+    else
+        echo -e "${RED}❌ 存储失败${NC}"
+        exit 1
+    fi
+}
+
+# 全局记忆写入（跨Agent共享）
+do_global_write() {
+    local content="$1"
+    local title="$2"
+    local tags="$3"
+    
+    if [ -z "$content" ]; then
+        echo -e "${RED}错误: 需要提供内容${NC}"
+        exit 1
+    fi
+    
+    # 写入全局 Viking
+    export SV_WORKSPACE="$HOME/.openclaw/viking-global"
+    export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    local date_str=$(date +%Y-%m-%d)
+    local viking_path="viking://shared/tasks/${date_str}.md"
+    
+    echo -e "${YELLOW}正在写入全局记忆...${NC}"
+    echo -e "# ${title:-任务完成}\n\n${content}" | sv_write "$viking_path" 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 已写入全局记忆: $viking_path${NC}"
+    else
+        echo -e "${RED}❌ 写入失败${NC}"
+    fi
+}
+do_search() {
+    local keyword="$1"
+    local use_vector="${2:-}"
+    
+    if [ -z "$keyword" ]; then
+        echo -e "${RED}错误: 需要提供搜索关键词${NC}"
+        exit 1
+    fi
+    
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    echo -e "${YELLOW}正在搜索: $keyword${NC}"
+    
+    # 优先使用向量搜索（如果可用）
+    if command -v sv &> /dev/null; then
+        sv semantic "$keyword" 5 2>/dev/null || sv_find "$keyword"
+    else
+        sv_find "$keyword"
+    fi
+}
+
+# 自动加载（会话启动时调用）
+do_autoload() {
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    echo "=== Viking 自动加载 ==="
+    echo ""
+    
+    # 1. 加载个人上下文
+    echo "📋 加载个人上下文..."
+    sv autoload maojingli 2>/dev/null || echo "(无)"
+    
+    # 2. 加载全局上下文（跨Agent记忆）
+    echo ""
+    echo "🌐 加载全局上下文..."
+    export SV_WORKSPACE="$HOME/.openclaw/viking-global"
+    sv semantic "任务 决策 重要" 3 2>/dev/null || echo "(无全局记忆)"
+    
+    # 3. 搜索其他Agent的记忆
+    echo ""
+    echo "🔗 加载团队记忆..."
+    for agent in maoxiami maogongtou maozhuli; do
+        agent_workspace="$HOME/.openclaw/viking-$agent"
+        if [ -d "$agent_workspace" ]; then
+            export SV_WORKSPACE="$agent_workspace"
+            echo "--- $agent ---"
+            sv semantic "任务 完成" 2 2>/dev/null || echo "(无)"
+        fi
+    done
+    
+    # 恢复个人 workspace
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    
+    echo ""
+    echo "=== 加载完成 ==="
+}
+
+# 主命令处理
+case "${1:-}" in
+    --help|-h)
+        show_help
+        ;;
+    mp_store)
+        shift
+        do_store "$@"
+        ;;
+    mp_search)
+        shift
+        do_search "$@"
+        ;;
+    mp_global)
+        shift
+        do_global_write "$@"
+        ;;
+    mp_autoload|autoload)
+        do_autoload
+        ;;
+    *)
+        echo -e "${RED}未知命令: $1${NC}"
+        show_help
+        exit 1
+        ;;
+esac
