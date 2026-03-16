@@ -40,23 +40,18 @@ is_important_memory() {
     local file="$1"
     local content=$(cat "$file" 2>/dev/null)
     
-    # 跳过自动保存的记忆（让它们正常降级）
-    if echo "$content" | grep -qE "auto_saved: *true"; then
-        return 1
-    fi
-    
     # 检查 frontmatter 中的 importance: high
     if echo "$content" | grep -qE "^importance: *high"; then
         return 0
     fi
     
-    # 检查标签中的"重要"、"高优先级"（排除自动保存）
+    # 检查标签中的"重要"、"高优先级"
     if echo "$content" | grep -qE "tags:.*\[.*重要|高优先级"; then
         return 0
     fi
     
-    # 检查内容中的高权重关键词（排除自动保存）
-    if echo "$content" | grep -qiE "紧急|严重|致命|关键决策|重要里程碑"; then
+    # 检查内容中的高权重关键词
+    if echo "$content" | grep -qiE "紧急|严重|致命|董事长|guyxlous|关键决策|重要里程碑"; then
         return 0
     fi
     
@@ -120,10 +115,9 @@ downgrade_tier() {
         # 读取内容，更新层级标识
         content=$(cat "$file")
         
-        # 替换层级标识（支持多种格式）
+        # 替换层级标识
         new_content="${content//\[$source_tier\]/[$target_tier]}"
         new_content="${new_content//层级: $source_tier/层级: $target_tier}"
-        new_content="${new_content//tier: $source_tier/tier: $target_tier}"
         
         # 压缩内容（根据目标层级）
         case "$target_tier" in
@@ -161,10 +155,8 @@ downgrade_tier() {
         target_file="$target_dir/$filename"
         echo "$new_content" > "$target_file"
         
-        # 删除源文件（仅当 source_dir != target_dir 时）
-        if [ "$source_dir" != "$target_dir" ]; then
-            rm -f "$file"
-        fi
+        # 删除源文件
+        rm -f "$file"
         
         echo "  ✅ $filename -> $target_tier"
     done

@@ -142,41 +142,17 @@ for agent in $AGENTS; do
     
     if [ "$agent" = "global" ]; then
         export SV_WORKSPACE="$HOME/.openclaw/viking-global"
-        # global 是全局共享空间，不自动生成会话记忆，只执行降级
-        echo "  (跳过自动保存，global 只保留手动写入的记忆)"
     else
         export SV_WORKSPACE="$HOME/.openclaw/viking-$agent"
-        # 步骤1: 自动保存昨日会话摘要（仅对 Agent）
-        auto_save_yesterday "$agent" "$SV_WORKSPACE"
-        # 注意：创建后跳过降级，让新记忆在 hot 保留 1 天
-        echo "  (新记忆保留在 hot，稍后自动降级)"
     fi
     
-    # 步骤2: 执行降级（仅对 global）
-    if [ "$agent" = "global" ]; then
-        "$SCRIPT_DIR/memory-tier-downgrade.sh" "$agent" || echo "  ⚠️ $agent 降级完成"
-    fi
+    # 步骤1: 自动保存昨日会话摘要（新增）
+    auto_save_yesterday "$agent" "$SV_WORKSPACE"
+    
+    # 步骤2: 执行降级
+    "$SCRIPT_DIR/memory-tier-downgrade.sh" "$agent" || echo "  ⚠️ $agent 降级完成"
     
     echo ""
 done
 
 echo "=== 全部完成 ==="
-
-# ===== 构建向量索引 =====
-echo ">>> 构建向量索引..."
-export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
-if command -v sv &> /dev/null; then
-    sv build-index "$HOME/.openclaw/viking-global" 100
-    echo "  ✅ 全局向量索引构建完成"
-    
-    # 为每个 Agent 构建索引
-    for agent in maojingli maoxiami maogongtou maozhuli; do
-        export SV_WORKSPACE="$HOME/.openclaw/viking-$agent"
-        sv build-index "$SV_WORKSPACE" 100
-        echo "  ✅ $agent 向量索引构建完成"
-    done
-else
-    echo "  ⚠️ sv 命令未找到，跳过向量索引构建"
-fi
-
-echo "=== 所有任务完成 ==="
