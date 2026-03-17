@@ -1,0 +1,496 @@
+#!/bin/bash
+#
+# memory-pipeline CLI 工具
+# 统一记忆存取工作流
+#
+
+set -e
+
+# 默认 Agent - 动态读取环境变量
+AGENT_NAME="${AGENT_NAME:-maojingli}"
+export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-$AGENT_NAME}"
+
+# 确保 simple-viking 脚本在 PATH 中
+export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# 帮助信息
+show_help() {
+    cat << EOF
+memory-pipeline - 统一记忆存取工作流
+
+用法:
+    mp_store [选项]          存储记忆
+    mp_search <关键词>        搜索记忆
+    mp_global <内容>          写入全局记忆(跨Agent共享)
+    mp_autoload              自动加载所有记忆
+
+选项:
+    --content <文本>         要存储的内容（支持多行）
+    --title <标题>          记忆标题
+    --tags <标签>           标签（逗号分隔）
+    --tier <层级>           记忆层级: L0|L1|L2|L3|L4 (默认: L0)
+    --importance <级别>     重要性: low|medium|high (自动检测)
+    --important            标记为重要记忆（不降级）
+    --auto                   自动判断层级（根据内容长度）
+    --global                 写入全局记忆
+    --help                  显示帮助
+
+分层原则:
+    L0-原始 (0-1天):   100%完整细节 - 背景、过程、决策、结果、待办
+    L1-轮廓 (2-7天):  ~70%核心轮廓 - 关键信息、结果
+    L2-关键词 (8-30天): ~30%关键信息 - 搜索触发
+    L3-标签 (30-90天):  ~10%极简标签 - 搜索触发
+    L4-归档 (90天+):    0%归档 - 搜索可回忆
+
+示例:
+    mp_store --content "今天完成了任务" --title "2026-03-11" --tier L0
+    mp_store --content "背景: xxx\\n过程: xxx\\n结果: xxx" --title "详细记录" --tier L0
+    mp_search "项目"
+    mp_global "任务完成：xxx" --title "xxx"
+    mp_autoload
+EOF
+}
+
+# 解析多行内容的函数
+parse_multiline_content() {
+    local content="$1"
+    # 处理 \n 转义为实际换行
+    echo -e "$content"
+}
+
+# 自动判断记忆重要性
+auto_detect_importance() {
+    local content="$1"
+    local title="$2"
+    
+    local full_text="$title $content"
+    
+    # 重要关键词（命中即高优先级）
+    local important_keywords="董事长|guyxlous|紧急|关键|决策|致命|严重|bug|错误|完成|交付|会议|面试|生日|支付|账号|密码"
+    
+    if echo "$full_text" | grep -qiE "$important_keywords"; then
+        # 排除日常任务/推送任务：这些任务完成不应标记为高优先级
+        local daily_keywords="推送|日常|定时|cron|例行|循环|日报|周报"
+        if echo "$full_text" | grep -qiE "$daily_keywords"; then
+            echo "low"
+            return
+        fi
+        echo "high"
+        return
+    fi
+    
+    # 中等重要性：包含待办事项
+    if echo "$content" | grep -qE "^- \[ \]"; then
+        echo "medium"
+        return
+    fi
+    
+    echo "low"
+}
+
+# 自动判断是否标记为重要（不降级）
+auto_detect_important() {
+    local content="$1"
+    local title="$2"
+    
+    local full_text="$title $content"
+    
+    # 核心重要标记（这些记忆永不降级）
+    local critical_keywords="董事长|guyxlous|紧急|致命|严重|支付|账号|密码|面试"
+    
+    if echo "$full_text" | grep -qiE "$critical_keywords"; then
+        echo "true"
+        return
+    fi
+    
+    echo "false"
+}
+
+# 构建分层记忆内容
+build_tiered_content() {
+    local raw_content="$1"
+    local tier="${2:-hot}"
+    local detail="${3:-high}"
+    
+    # 解析原始内容（支持 \n 转义）
+    local content
+    content=$(echo -e "$raw_content")
+    
+    case "$tier" in
+        hot)
+            # hot: 完整详细记录
+            if [ "$detail" = "high" ]; then
+                # 高细节：完整背景、过程、决策、结果、待办
+                echo "$content"
+            else
+                # 中低细节：精简版本
+                echo "$content" | head -20
+            fi
+            ;;
+        warm)
+            # warm: 精简版，提取关键信息
+            echo "$content" | grep -v "^#" | head -10
+            ;;
+        cold)
+            # cold: 极简版，一句话总结
+            echo "$content" | head -3
+            ;;
+        L0)
+            # L0: 完整详细记录
+            echo "$content"
+            ;;
+        L1)
+            # L1: 核心轮廓 ~70%
+            echo "$content" | head -10
+            ;;
+        L2)
+            # L2: 关键词 ~30%
+            echo "$content" | head -5
+            ;;
+        L3)
+            # L3: 极简标签 ~10%
+            echo "$content" | head -3
+            ;;
+        L4)
+            # L4: 归档仅标题
+            echo "$content" | head -1
+            ;;
+        *)
+            echo "$content"
+            ;;
+    esac
+}
+
+# 确定记忆层级的函数
+determine_tier() {
+    local content="$1"
+    local tier_option="$2"
+    
+    # 如果用户指定了层级，直接使用
+    if [ -n "$tier_option" ] && [ "$tier_option" != "auto" ]; then
+        echo "$tier_option"
+        return
+    fi
+    
+    # 自动判断：根据内容长度
+    local length=$(echo -e "$content" | wc -c)
+    
+    if [ "$tier_option" = "auto" ]; then
+        # auto 模式：根据长度自动判断
+        if [ "$length" -gt 3000 ]; then
+            echo "L0"
+        elif [ "$length" -gt 1500 ]; then
+            echo "L1"
+        elif [ "$length" -gt 500 ]; then
+            echo "L2"
+        elif [ "$length" -gt 100 ]; then
+            echo "L3"
+        else
+            echo "L4"
+        fi
+    else
+        # 默认写入 L0
+        echo "L0"
+    fi
+}
+
+# 存储记忆
+do_store() {
+    local content=""
+    local title=""
+    local tags=""
+    local tier="L0"
+    local detail="high"
+    local auto=false
+    local importance=""  # 自动判断
+    local is_important=""  # 自动判断
+    
+    # 添加 simple-viking 到 PATH
+    export PATH="$HOME/.openclaw/skills/simple-viking/tools:$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --content)
+                content="$2"
+                shift 2
+                ;;
+            --title)
+                title="$2"
+                shift 2
+                ;;
+            --tags)
+                tags="$2"
+                shift 2
+                ;;
+            --tier)
+                tier="$2"
+                shift 2
+                ;;
+            --detail)
+                detail="$2"
+                shift 2
+                ;;
+            --auto)
+                auto=true
+                shift
+                ;;
+            --importance)
+                importance="$2"
+                shift 2
+                ;;
+            --important)
+                is_important="true"
+                shift
+                ;;
+            --global)
+                # 全局记忆在后面处理
+                shift
+                ;;
+            *)
+                echo -e "${RED}未知选项: $1${NC}"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [ -z "$content" ]; then
+        echo -e "${RED}错误: 需要 --content 参数${NC}"
+        exit 1
+    fi
+    
+    # 设置 Viking workspace（从环境变量或默认值）
+    AGENT_NAME="${AGENT_NAME:-maojingli}"
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-$AGENT_NAME}"
+    
+    # 确定层级
+    if [ "$auto" = true ]; then
+        tier=$(determine_tier "$content" "auto")
+    else
+        tier=$(determine_tier "$content" "$tier")
+    fi
+    
+    # 构建分层内容
+    local processed_content
+    processed_content=$(build_tiered_content "$content" "$tier" "$detail")
+    
+    # 自动判断重要性（如果未指定）
+    if [ -z "$importance" ]; then
+        importance=$(auto_detect_importance "$content" "$title")
+    fi
+    if [ -z "$is_important" ]; then
+        is_important=$(auto_detect_important "$content" "$title")
+    fi
+    
+    # 生成文件名和路径（基于层级）
+    local date_str=$(date +%Y-%m-%d)
+    local timestamp=$(date +%Y%m%d%H%M%S)
+    
+    # 根据层级选择存储路径（目录用 hot/warm/cold/archive）
+    case "$tier" in
+        L0|L1)
+            # L0 和 L1 都存 hot（近期）
+            local viking_path="viking://agent/memories/hot/${date_str}_${timestamp}.md"
+            ;;
+        L2)
+            # L2 存 warm
+            local viking_path="viking://agent/memories/warm/${date_str}_${timestamp}.md"
+            ;;
+        L3)
+            # L3 存 cold
+            local viking_path="viking://agent/memories/cold/${date_str}_${timestamp}.md"
+            ;;
+        L4)
+            # L4 存 archive
+            local viking_path="viking://agent/memories/archive/${date_str}_${timestamp}.md"
+            ;;
+    esac
+    
+    # 生成唯一 ID
+    local mem_id="mem_${date_str}_${timestamp}"
+    
+    # 构建 Frontmatter 元数据
+    local md_content="---
+id: $mem_id
+title: \"${title:-今日记忆}\"
+importance: ${importance:-medium}
+important: ${is_important:-false}
+tags: [${tags:-}]
+created: $(date -Iseconds)
+last_access: $(date -Iseconds)
+access_count: 0
+retention: 90
+current_layer: $tier
+level: ${tier#L}
+weight: 10.0
+---
+
+# ${title:-今日记忆} [$tier]
+
+**层级**: $tier | **创建时间**: $(date)
+"
+    if [ -n "$tags" ]; then
+        md_content+="**标签**: ${tags}\n"
+    fi
+    md_content+="\n---\n\n"
+    md_content+="$processed_content\n"
+    
+    # 写入 Viking
+    echo -e "${YELLOW}正在存储到 Viking (层级: $tier)...${NC}"
+    echo -e "$md_content" | sv_write "$viking_path" "$(echo -e "$md_content")"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 记忆已存储 [$tier]: $viking_path${NC}"
+        echo -e "${GREEN}📝 内容预览:${NC}"
+        echo "$processed_content" | head -5
+        
+        # 计算正确的目录路径
+        local subdir="hot"
+        case "$tier" in
+            L0|L1) subdir="hot" ;;
+            L2) subdir="warm" ;;
+            L3) subdir="cold" ;;
+            L4) subdir="archive" ;;
+        esac
+        
+        local full_path="$SV_WORKSPACE/agent/memories/${subdir}/${date_str}_${timestamp}.md"
+        
+        if [ -f "$full_path" ]; then
+            /bin/bash "$HOME/.openclaw/skills/memory-pipeline/scripts/memory-embed.sh" \
+                embed "$full_path" "$SV_WORKSPACE"
+            echo -e "${GREEN}✅ 向量已生成${NC}"
+        else
+            echo -e "${YELLOW}⚠️ 文件未找到: $full_path${NC}"
+        fi
+    else
+        echo -e "${RED}❌ 存储失败${NC}"
+        exit 1
+    fi
+}
+
+# 全局记忆写入（跨Agent共享）
+do_global_write() {
+    local content="$1"
+    local title="$2"
+    local tags="$3"
+    
+    # 添加 simple-viking 到 PATH
+    export PATH="$HOME/.openclaw/skills/simple-viking/tools:$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    if [ -z "$content" ]; then
+        echo -e "${RED}错误: 需要提供内容${NC}"
+        exit 1
+    fi
+    
+    # 写入全局 Viking
+    export SV_WORKSPACE="$HOME/.openclaw/viking-global"
+    export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    local date_str=$(date +%Y-%m-%d)
+    local viking_path="viking://shared/tasks/${date_str}.md"
+    
+    echo -e "${YELLOW}正在写入全局记忆...${NC}"
+    local full_content="# ${title:-任务完成}\n\n${content}"
+    sv_write "$viking_path" "$full_content"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 已写入全局记忆: $viking_path${NC}"
+    else
+        echo -e "${RED}❌ 写入失败${NC}"
+    fi
+}
+do_search() {
+    local keyword="$1"
+    local use_vector="${2:-}"
+    
+    # 添加 simple-viking 到 PATH
+    export PATH="$HOME/.openclaw/skills/simple-viking/tools:$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    if [ -z "$keyword" ]; then
+        echo -e "${RED}错误: 需要提供搜索关键词${NC}"
+        exit 1
+    fi
+    
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    
+    echo -e "${YELLOW}正在搜索: $keyword${NC}"
+    echo -e "${YELLOW}优先使用向量混合检索...${NC}"
+    
+    # 优先使用向量混合搜索（如果可用）
+    if command -v sv &> /dev/null; then
+        # 优先混合搜索（向量+关键词），失败则回退到关键词搜索
+        sv hybrid "$keyword" 5 2>/dev/null || sv_find "$keyword"
+    else
+        sv_find "$keyword"
+    fi
+}
+
+# 自动加载（会话启动时调用）
+do_autoload() {
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    export PATH="$HOME/.openclaw/skills/simple-viking/scripts:$PATH"
+    
+    echo "=== Viking 自动加载 ==="
+    echo ""
+    
+    # 1. 加载个人上下文
+    echo "📋 加载个人上下文..."
+    sv autoload maojingli 2>/dev/null || echo "(无)"
+    
+    # 2. 加载全局上下文（跨Agent记忆）
+    echo ""
+    echo "🌐 加载全局上下文..."
+    export SV_WORKSPACE="$HOME/.openclaw/viking-global"
+    sv semantic "任务 决策 重要" 3 2>/dev/null || echo "(无全局记忆)"
+    
+    # 3. 搜索其他Agent的记忆
+    echo ""
+    echo "🔗 加载团队记忆..."
+    for agent in maoxiami maogongtou maozhuli; do
+        agent_workspace="$HOME/.openclaw/viking-$agent"
+        if [ -d "$agent_workspace" ]; then
+            export SV_WORKSPACE="$agent_workspace"
+            echo "--- $agent ---"
+            sv semantic "任务 完成" 2 2>/dev/null || echo "(无)"
+        fi
+    done
+    
+    # 恢复个人 workspace
+    export SV_WORKSPACE="${SV_WORKSPACE:-$HOME/.openclaw/viking-maojingli}"
+    
+    echo ""
+    echo "=== 加载完成 ==="
+}
+
+# 主命令处理
+case "${1:-}" in
+    --help|-h)
+        show_help
+        ;;
+    mp_store)
+        shift
+        do_store "$@"
+        ;;
+    mp_search)
+        shift
+        do_search "$@"
+        ;;
+    mp_global)
+        shift
+        do_global_write "$@"
+        ;;
+    mp_autoload|autoload)
+        do_autoload
+        ;;
+    *)
+        echo -e "${RED}未知命令: $1${NC}"
+        show_help
+        exit 1
+        ;;
+esac

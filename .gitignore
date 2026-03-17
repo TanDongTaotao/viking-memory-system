@@ -1,0 +1,21 @@
+# 临时文件
+*.tmp
+*.swp
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 向量数据库
+.viking_vectors.json
+.viking_vectors/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 环境变量
+.env
+.env.local
