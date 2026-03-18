@@ -171,6 +171,82 @@ sv autoload maojingli
 3. ✅ global 错误生成记忆 → 跳过自动保存
 4. ✅ 自动保存误判重要 → 简化判断逻辑
 5. ✅ 新增：向量相似度提及检测
+6. ✅ 新增：飞书群聊会话自动检测保存
+
+---
+
+## 飞书群聊会话自动保存（扩展功能）
+
+配合 Viking 记忆系统使用，可自动判断飞书群聊会话结束，自动保存记忆。
+
+### 功能特性
+
+- **自动检测**：每5分钟检查会话活跃状态
+- **超时保存**：30分钟无新消息自动触发记忆保存
+- **多会话支持**：每个飞书群聊独立计时，互不影响
+- **无缝集成**：自动调用 `memory-session-hook.sh` 保存记忆
+
+### 工作原理
+
+```
+飞书群收到消息
+    ↓
+更新会话活跃时间
+    ↓
+每5分钟检查所有会话
+    ↓
+超过30分钟无新消息
+    ↓
+调用 memory-session-hook.sh 保存记忆
+```
+
+### 安装
+
+飞书插件需要安装 OpenClaw 飞书扩展：
+
+```bash
+# 确保已安装飞书插件
+openclaw plugins install feishu
+```
+
+### 配置
+
+会话管理器代码位于飞书插件中：
+
+```
+~/.npm-global/lib/node_modules/openclaw/extensions/feishu/src/session-manager.ts
+```
+
+**默认参数：**
+- 检查间隔：5分钟
+- 超时时间：30分钟
+
+如需修改，可编辑源码中的配置：
+
+```typescript
+const config = {
+  checkIntervalMs: 5 * 60 * 1000,  // 5分钟
+  timeoutMs: 30 * 60 * 1000,        // 30分钟
+};
+```
+
+### 使用
+
+1. 启动 OpenClaw Gateway：
+   ```bash
+   openclaw gateway start
+   ```
+
+2. 在飞书群聊中正常对话，系统会自动检测会话结束
+
+3. 30分钟无新消息后，自动保存记忆到 Viking 系统
+
+### 日志
+
+查看会话管理器日志：
+```bash
+tail -f /tmp/openclaw/openclaw-YYYY-MM-DD.log | grep session-manager
+```
 
 ---
 
